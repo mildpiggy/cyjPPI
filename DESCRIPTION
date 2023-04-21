@@ -1,0 +1,16 @@
+Package: cyjPPI
+Type: Package
+Title: Cytoscape shiny tool for FI analysis.
+Version: 0.1.0
+Author: Feng Zhenhuan
+Maintainer: Feng Zhenhuan <yourself@somewhere.net>
+Description: An experimental packge to perform FI analysis upon DEP2 results.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R6,
+    cyjShiny,
+    DEP2,
+    clusterProfiler,
+    R (>= 4.1.0)

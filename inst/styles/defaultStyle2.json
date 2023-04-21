@@ -1,0 +1,103 @@
+[{
+  "selector" : "node", "css": {
+  "text-valign": "center",
+  "text-halign": "center",
+  "content": "data(id)",
+  "border-color": "red",
+  "background-color": "white",
+  "border-width": 4.5,
+  "height": 51,
+  "width": 70
+}},{
+  "selector" : "node[highlighted]",
+  "css" : {
+    "border-color" : "rgb(255,102,102)"
+  }
+}, {
+  "selector" : "node[!highlighted]",
+  "css" : {
+    "border-color" : "rgb(204,204,204)"
+  }
+},{
+    "selector" : "node[lfc > 4.76]",
+    "css" : {
+      "background-color" : "rgb(178,24,43)"
+    }
+  }, {
+    "selector" : "node[lfc = 4.76]",
+    "css" : {
+      "background-color" : "rgb(214,96,77)"
+    }
+  }, {
+    "selector" : "node[lfc > 0][lfc < 4.76]",
+    "css" : {
+      "background-color" : "mapData(lfc,0,4.76,rgb(247,247,247),rgb(214,96,77))"
+    }
+  }, {
+    "selector" : "node[lfc > -4.76][lfc < 0]",
+    "css" : {
+      "background-color" : "mapData(lfc,-4.76,0,rgb(67,147,195),rgb(247,247,247))"
+    }
+  }, {
+    "selector" : "node[lfc = -4.76]",
+    "css" : {
+      "background-color" : "rgb(67,147,195)"
+    }
+  }, {
+    "selector" : "node[lfc < -4.76]",
+    "css" : {
+      "background-color" : "rgb(33,102,172)"
+    }
+  },{
+    "selector" : "node[lfc <= 0][lfc >= 0]",
+    "css" : {
+      "background-color" : "rgb(247,247,247)"
+    }
+  },
+{"selector": "node:selected", "css": {
+  "overlay-color": "gray",
+  "overlay-opacity": 0.4
+}},
+{"selector": "edge", "css": {
+  "width": "1px",
+  "line-color": "black",
+  "target-arrow-shape": "none",
+  "target-arrow-color": "black",
+  "source-arrow-color": "black",
+  "curve-style": "bezier"
+}},{
+    "selector" : "edge[Direction = '<-']",
+    "css" : {
+      "source-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[Direction = '|-']",
+    "css" : {
+      "source-arrow-shape" : "tee"
+    }
+  }, {
+    "selector" : "edge[Direction = '<->']",
+    "css" : {
+      "source-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[Direction = '->']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[Direction = '<->']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[Direction = '-|']",
+    "css" : {
+      "target-arrow-shape" : "tee"
+    }
+  },
+{"selector": "edge:selected", "css": {
+  "overlay-color": "gray",
+  "overlay-opacity": 0.4
+}}
+]
