@@ -1,4 +1,11 @@
 ## Define R6 class----------------------------------------------------------------------------------------------------
+#' R6 Class store cyjFI
+#'
+#' @description
+#' This R6 object store a shiny app to visual display protein interaction and enriched protein annotation.
+#'
+#' @details
+#'
 PPI.enrich.R6.Shiny = R6Class(
   "PPI.enrich.R6.Shiny",
 
@@ -6,10 +13,10 @@ PPI.enrich.R6.Shiny = R6Class(
   private = list(
     currentValue = NULL,
     cyj = NULL, # 储存第一时间的cyj对象
-    network_json = NULL,
+    network_json = NULL, # the generate json
     session = NULL,
     layout = NULL, # 储存node position 信息
-    style_arguments = NULL # 储存 manual style 的颜色信息
+    previous_arguments = NULL # 储存 manual style 的颜色信息
   ),
 
   # public values --------------------------------------------------------------------------------
@@ -20,7 +27,7 @@ PPI.enrich.R6.Shiny = R6Class(
     }, ## 返回 cyj 对象
 
     return_argument = function(){
-      return(private$style_arguments)
+      return(private$previous_arguments)
     },
 
     return_session = function(){
@@ -55,8 +62,6 @@ PPI.enrich.R6.Shiny = R6Class(
 
         sidebarLayout(
 
-
-
           sidebarPanel(
             ## layout
             # uiOutput("selectnode_UI"),
@@ -82,10 +87,10 @@ PPI.enrich.R6.Shiny = R6Class(
             br(),hr(),
             h4(strong("Style options")),
             selectInput("visualStyleSelector", "Select Visual Style",
-                        choices=styles),
-            column(colourInput("high_color",label = "High color",value = "#E30ACF"), width = 4),
-            column(colourInput("mid_color",label = "Mid color",value = "#F2F2F2"), width = 4),
-            column(colourInput("low_color",label = "Low color",value = "#1BABBF"), width = 4),
+                        choices=cyjPPI::styles()),
+            column(colourpicker::colourInput("high_color",label = "High color",value = "#E30ACF"), width = 4),
+            column(colourpicker::colourInput("mid_color",label = "Mid color",value = "#F2F2F2"), width = 4),
+            column(colourpicker::colourInput("low_color",label = "Low color",value = "#1BABBF"), width = 4),
             column(numericInput("col_limit",label = "Color outer limit",value = 4), width = 6),
             column(numericInput("mid_limit",label = "Color middle blank",value = 1), width = 6),
             actionButton(inputId = "reDraw","Redraw in style"),
@@ -115,22 +120,25 @@ PPI.enrich.R6.Shiny = R6Class(
 
             ),
             fluidRow(
-              column(DTOutput("enriched_table"),width = 12)
+              column(DT::DTOutput("enriched_table"),width = 12)
 
             )
             #style="margin-left:0px; padding-left:0px;"
           )
         ) # sidebarLayout
-      )}, # ui
+      )
+    }, # ui
 
     # shiny server function, initialize though the results data stored in S6 public ------------------------------------------------------------
     server = function(input, output, session,
                       PPIres = self$PPIres, ORAres = self$ORAres, DEPres = self$DEPres){
 
 
-      ora_res2 <- ora_res %>%
-        clusterProfiler.dplyr::filter(qvalue<0.2,pvalue < 0.05) %>%
+      ora_res2 <- ORAres %>%
+        # clusterProfiler.dplyr::filter(qvalue<0.2,pvalue < 0.05) %>%
         as.data.frame()
+
+      # ora_res222 <<- ora_res2
 
       observeEvent(input$fit, ignoreInit=TRUE, {
         fit(session, 80)
@@ -146,11 +154,11 @@ PPI.enrich.R6.Shiny = R6Class(
       })
 
       observeEvent(input$tbl.nodePositions, ignoreInit=TRUE, {
-        printf("new posTable ready\n");
+        R.utils::printf("New position table ready and is stored in object. \n");
         tbl <- fromJSON(input$tbl.nodePositions) # layout is returned in tbl.nodePositions
         private$layout <- tbl  # store layout in
         # state$tbl.nodePositions <- tbl
-        print(tbl)
+        print(DataFrame(tbl))
       })
 
 
@@ -247,7 +255,7 @@ PPI.enrich.R6.Shiny = R6Class(
       # Unhightlight ----
       unhightlight <- reactiveVal(0)
       observeEvent(input$unhightselection, ignoreInit=TRUE, {
-        cat("awef")
+        # cat("awef")
         # session$sendCustomMessage("getSelected2", message = list())
         session$sendCustomMessage("getALL", message = list())
         getSelectedNodes(session)
@@ -294,16 +302,15 @@ PPI.enrich.R6.Shiny = R6Class(
           input$reDraw
           input$visualStyleSelector
           Manual_style_jstext()
-          input$Layoutname
+          # input$Layoutname
         },
         ignoreInit=F,
         ignoreNULL = F,
         {
           newStyleFile <- input$visualStyleSelector
-          newStyleFile222 <<- input$visualStyleSelector
-          printf("newStyle: %s\n", newStyleFile)
+          R.utils::printf("Switch style\n")
 
-          input_arguments <<- private$style_arguments
+          input_arguments <- private$previous_arguments
           if(newStyleFile == "Manual"){
             if(init_style() < 3
                &&
@@ -330,23 +337,51 @@ PPI.enrich.R6.Shiny = R6Class(
 
       # change layout, 根据 Layoutname dolayout
       init_layout <- reactiveVal({
-        init_layout111 <<-
+        if(is.null(private$layout)){
+          "First"
+        }else{
           private$layout
+        }
       })
       observeEvent(input$Layoutname,  ignoreInit=F,{
-        if(input$Layoutname != ""){
+        # if(input$Layoutname != ""){
+        #   strategy <- input$Layoutname
+        #   Sys.sleep(0.5)
+        #   doLayout(session, strategy)
+        #   R.utils::printf(paste0("Change1 layout to ",strategy,"\n"))
+        #   # later::later(function() {updateSelectInput(session, "doLayout", selected=character(0))}, 1)
+        # }
+        init_layout111 <<- init_layout()
+        if( !is.null(init_layout()) ){
+          ## initiation
+          if( init_layout() != "First" && nrow(init_layout()) > 0 ){
+            # restore node postion base on the save layout
+            Sys.sleep(1)  # wait a second for cyj initiation
+            R.utils::printf("Restore the layout based on a saved position table. \n")
+            print(DataFrame(init_layout111))
+            cat("\n")
+            setNodePositions(session, init_layout111)
+
+            init_layout = init_layout(NULL) ## assign init_layout NULL to avoid restore position after initiation
+
+          }else if(init_layout() == "First" & input$Layoutname != "cose"){
+            # restore node postion base on the save layout
+            strategy <- input$Layoutname
+            Sys.sleep(1) # wait a second for cyj initiation
+            doLayout(session, strategy)
+            R.utils::printf(paste0("Initiated layout is ",strategy,".\n"))
+            init_layout = init_layout(NULL)
+
+          }else{
+            Sys.sleep(1)
+            init_layout = init_layout(NULL)
+          }
+
+        }else if(input$Layoutname != ""){
           strategy <- input$Layoutname
           Sys.sleep(0.5)
           doLayout(session, strategy)
-          print(paste0("Change layout to ",strategy))
-          # later::later(function() {updateSelectInput(session, "doLayout", selected=character(0))}, 1)
-        }
-        if( (!is.null(init_layout())) && nrow(init_layout()) > 0){
-          Sys.sleep(1.5)
-          cat("Restore the layout based on a saved position at app launch \n")
-          print(head(init_layout111))
-          setNodePositions(session, init_layout111)
-          init_layout = init_layout(NULL)
+          R.utils::printf(paste0("Change layout to ",strategy,".\n"))
         }
       })
 
@@ -357,9 +392,8 @@ PPI.enrich.R6.Shiny = R6Class(
         layoutName = "cose"
         # }else{layoutName = input$Layoutname}
         the_cjs <- PPI2cyj(PPIres = PPIres,
-                           L2FC_tab = get_signicant(DEPres,contrasts = "W4_vs_PBS",
-                                                    return_type = "table") %>% dplyr::select(name, W4_vs_PBS_ratio),
-                           layoutName = layoutName) ## 这里可以如果layoutname 固定成 cose
+                           L2FC_tab = get_lfc(DEPres),
+                           layoutName = layoutName)  ## 这里可以把 layoutname 固定成 cose，后面通过 observeEvent(input$Layoutname) 进行 layout 的变动
       })
 
 
@@ -372,7 +406,7 @@ PPI.enrich.R6.Shiny = R6Class(
         the_cjs()
       })
 
-      output$enriched_table <- renderDT({
+      output$enriched_table <- DT::renderDT({
         the_res <- as.data.frame(ora_res2)
         the_res[,c('pvalue', 'p.adjust','qvalue')] <- signif(the_res[,c('pvalue', 'p.adjust','qvalue')],3)
         the_res[,c('pvalue', 'p.adjust','qvalue')] <- format(the_res[,c('pvalue', 'p.adjust','qvalue')],scientific = T)
@@ -419,8 +453,6 @@ PPI.enrich.R6.Shiny = R6Class(
 
       output$downPNGbutton <- downloadHandler(
         filename = function() {
-          # session$sendCustomMessage(type = "savePNGtoFile11", message = list(file.name))
-          # cat("awef\n")
           paste("foo", ".png", sep="")
         },
         content = function(file) {
@@ -437,7 +469,8 @@ PPI.enrich.R6.Shiny = R6Class(
         if(visualStyleSelector != "Manual") # use other style file
           return(11)
 
-        cat("Generate a manual_style_jstext\n")
+        R.utils::printf("Generate a manual_style_jstext\n")
+        default_obj = fromJSON(styles()["Default"])
         obj = default_obj
         obj[obj$selector %>% grep("node\\[lfc",.,value=F),] -> temp
 
@@ -505,61 +538,41 @@ PPI.enrich.R6.Shiny = R6Class(
       # * render options ----
       output$layoutname_ui <- renderUI({
         # cat("awgewfdw")
-        # temp111 <<- private$style_arguments
+        # temp111 <<- private$previous_arguments
 
         selectInput("Layoutname", "Select Layoutname:",
                     choices = c("preset", "cose", "cola", "circle",
                                 "concentric", "breadthfirst", "grid",
                                 "random", "dagre", "euler",
                                 "fcose","springy","spread"),
-                    selected = ifelse(is.null(private$style_arguments$Layoutname),
+                    selected = ifelse(is.null(private$previous_arguments$Layoutname),
                                       "cose",
-                                      private$style_arguments$Layoutname)
+                                      private$previous_arguments$Layoutname)
         )
       })
 
       # updata style options after initialize
-      observeEvent(input$high_color,{
-        # temp111 <<- input$high_color
-        # temp222 <<-  private$style_arguments$high_color
-        if(!is.null(private$style_arguments)){
-          updateColourInput(session,"high_color", value = private$style_arguments$high_color)
-          updateColourInput(session,"low_color", value = private$style_arguments$low_color)
-          updateColourInput(session,"mid_color", value = private$style_arguments$mid_color)
-          updateNumericInput(session,"col_limit", value = private$style_arguments$col_limit)
-          updateNumericInput(session,"mid_limit", value = private$style_arguments$mid_limit)
-          updateSelectInput(session,"visualStyleSelector",
-                            choices = styles,
-                            selected = private$style_arguments$visualStyleSelector)
-
-          # ## 初始化style
-          # newStyleFile <- input$visualStyleSelector
-          # newStyleFile111 <<- newStyleFile
-          # printf("newStyle: %s\n", newStyleFile)
-          # if(newStyleFile == "Manual"){
-          #   Sys.sleep(2)
-          #   cat("First use a manual style \n")
-          #   # jsonText <- default_jsonText
-          #   jsonText <- Manual_style_jstext()
-          #   jsonText111 <<- jsonText
-          #   col_limit111 <<- input$col_limit
-          #   message <- list(json = jsonText)
-          #   session <- shiny::getDefaultReactiveDomain()
-          #   session$sendCustomMessage("loadStyle", message)
-          # }else{
-          #   loadStyleFile(newStyleFile)
-          # }
-          # private$session = shiny::getDefaultReactiveDomain()
-
-        }
-
-
-      },ignoreNULL = F,ignoreInit = F,once = T)
+      observeEvent(input$high_color,
+                   {
+                     # temp111 <<- input$high_color
+                     # temp222 <<-  private$previous_arguments$high_color
+                     if(!is.null(private$previous_arguments)){
+                       colourpicker::updateColourInput(session,"high_color", value = private$previous_arguments$high_color)
+                       colourpicker::updateColourInput(session,"low_color", value = private$previous_arguments$low_color)
+                       colourpicker::updateColourInput(session,"mid_color", value = private$previous_arguments$mid_color)
+                       updateNumericInput(session,"col_limit", value = private$previous_arguments$col_limit)
+                       updateNumericInput(session,"mid_limit", value = private$previous_arguments$mid_limit)
+                       updateSelectInput(session,"visualStyleSelector",
+                                         choices = cyjPPI::styles(),
+                                         selected = private$previous_arguments$visualStyleSelector)
+                     }
+                   },
+                   ignoreNULL = F,
+                   ignoreInit = F, once = T # update once after initializ
+      ) # load options
 
       output$downJSbutton <- downloadHandler(
         filename = function() {
-          # session$sendCustomMessage(type = "savePNGtoFile11", message = list(file.name))
-          # cat("awef\n")
           paste("foo", ".json", sep="")
         },
         content = function(file) {
@@ -574,7 +587,7 @@ PPI.enrich.R6.Shiny = R6Class(
       # end session
       session$onSessionEnded(function() {
         isolate({
-          private$style_arguments <- input
+          private$previous_arguments <- input # save input in the argument.
         })
       })
 
